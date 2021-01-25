@@ -5,14 +5,16 @@ Resources
 =================
 
 
-PyDataverse
+pyDataverse
 -----------------------------
-
-**Additional**
-
--   `pyDataverse CSV Templates <https://github.com/AUSSDA/pyDataverse_templates>`_: GitHub repository with CSV templates for pyDataverse
 
 **Presentations**
 
--   `pyDataverse Talk @ Dataverse Community Conference 2019 <https://zenodo.org/record/3265128>`_: Slides
--   `pyDataverse Demo @ European Dataverse Workshop Tromso<https://github.com/AUSSDA/pyDataverse_demo_tromso>`_: Demo with Jupyter Notebook
+-   `Slides <https://zenodo.org/record/3265128>`_: from talk at Dataverse Community Conference 2019
+-   `Jupyter Notebook Demo <https://github.com/AUSSDA/pyDataverse_demo_tromso>`_: at European Dataverse Workshop Tromso
+
+Dataverse
+-----------------------------
+
+- `Dataverse <https://dataverse.org/>`_
+    - `API Guide <https://guides.dataverse.org/en/latest/api/index.html>`_

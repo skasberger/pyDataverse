@@ -1,11 +1,8 @@
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
 """Dataverse API wrapper for all it's API's."""
-from __future__ import absolute_import
-
+import json
 import subprocess as sp
 
-from requests import ConnectionError, delete, get, post, put
+from requests import ConnectionError, Response, delete, get, post, put
 
 from pyDataverse.exceptions import (
     ApiAuthorizationError,
@@ -36,7 +33,9 @@ class Api:
 
     """
 
-    def __init__(self, base_url, api_token=None, api_version="latest"):
+    def __init__(
+        self, base_url: str, api_token: str = None, api_version: str = "latest"
+    ):
         """Init an Api() class.
 
         Scheme, host and path combined create the base-url for the api.
@@ -56,20 +55,19 @@ class Api:
             >>> from pyDataverse.api import Api
             >>> base_url = 'http://demo.dataverse.org'
             >>> api = Api(base_url)
-            >>> api.status
-            'OK'
 
         """
-        if not isinstance(base_url, ("".__class__, u"".__class__)):
+        if not isinstance(base_url, str):
             raise ApiUrlError("base_url {0} is not a string.".format(base_url))
+
         self.base_url = base_url
 
-        if not isinstance(api_version, ("".__class__, u"".__class__)):
+        if not isinstance(api_version, ("".__class__, "".__class__)):
             raise ApiUrlError("api_version {0} is not a string.".format(api_version))
         self.api_version = api_version
 
         if api_token:
-            if not isinstance(api_token, ("".__class__, u"".__class__)):
+            if not isinstance(api_token, ("".__class__, "".__class__)):
                 raise ApiAuthorizationError("Api token passed is not a string.")
         self.api_token = api_token
 
@@ -82,25 +80,6 @@ class Api:
                 )
         else:
             self.base_url_api = None
-
-        # try:
-        #     resp = self.get_info_version()
-        #     if 'data' in resp.json().keys():
-        #         if 'version' in resp.json()['data'].keys():
-        #             self.dataverse_version = resp.json()['data']['version']
-        #         else:
-        #             # TODO: raise exception
-        #             self.dataverse_version = None
-        #             print('Key not in response.')
-        #     else:
-        #         self.dataverse_version = None
-        #         # TODO: raise exception
-        #         print('Key not in response.')
-        # except:
-        #     self.dataverse_version = None
-        #     # TODO: raise exception
-        #     print('Dataverse build version can not be retrieved.')
-
         self.timeout = 500
 
     def __str__(self):
@@ -133,10 +112,10 @@ class Api:
             Response object of requests library.
 
         """
+        params = {}
+        params["User-Agent"] = "pydataverse"
         if auth:
             if self.api_token:
-                if not params:
-                    params = {}
                 params["key"] = str(self.api_token)
             else:
                 raise ApiAuthorizationError(
@@ -193,10 +172,10 @@ class Api:
             Response object of requests library.
 
         """
+        params = {}
+        params["User-Agent"] = "pydataverse"
         if auth:
             if self.api_token:
-                if not params:
-                    params = {}
                 params["key"] = self.api_token
             else:
                 raise ApiAuthorizationError("ERROR: POST - Api token not available.")
@@ -237,10 +216,10 @@ class Api:
             Response object of requests library.
 
         """
+        params = {}
+        params["User-Agent"] = "pydataverse"
         if auth:
             if self.api_token:
-                if not params:
-                    params = {}
                 params["key"] = self.api_token
             else:
                 raise ApiAuthorizationError(
@@ -283,10 +262,10 @@ class Api:
             Response object of requests library.
 
         """
+        params = {}
+        params["User-Agent"] = "pydataverse"
         if auth:
             if self.api_token:
-                if not params:
-                    params = {}
                 params["key"] = self.api_token
             else:
                 raise ApiAuthorizationError(
@@ -472,8 +451,11 @@ class DataAccessApi(Api):
         return self.get_request(url, auth=auth)
 
     def request_access(self, identifier, auth=True, is_filepid=False):
-        """
+        """Request datafile access.
+
         This method requests access to the datafile whose id is passed on the behalf of an authenticated user whose key is passed. Note that not all datasets allow access requests to restricted files.
+
+        https://guides.dataverse.org/en/4.18.1/api/dataaccess.html#request-access
 
         /api/access/datafile/$id/requestAccess
 
@@ -490,7 +472,10 @@ class DataAccessApi(Api):
         return self.put_request(url, auth=auth)
 
     def allow_access_request(self, identifier, do_allow=True, auth=True, is_pid=True):
-        """
+        """Allow access request for datafiles.
+
+        https://guides.dataverse.org/en/latest/api/dataaccess.html#allow-access-requests
+
         curl -H "X-Dataverse-key:$API_TOKEN" -X PUT -d true http://$SERVER/api/access/{id}/allowAccessRequest
         curl -H "X-Dataverse-key:$API_TOKEN" -X PUT -d true http://$SERVER/api/access/:persistentId/allowAccessRequest?persistentId={pid}
         """
@@ -510,7 +495,10 @@ class DataAccessApi(Api):
         return self.put_request(url, data=data, auth=auth)
 
     def grant_file_access(self, identifier, user, auth=False):
-        """
+        """Grant datafile access.
+
+        https://guides.dataverse.org/en/4.18.1/api/dataaccess.html#grant-file-access
+
         curl -H "X-Dataverse-key:$API_TOKEN" -X PUT http://$SERVER/api/access/datafile/{id}/grantAccess/{@userIdentifier}
         """
         url = "{0}/datafile/{1}/grantAccess/{2}".format(
@@ -519,7 +507,10 @@ class DataAccessApi(Api):
         return self.put_request(url, auth=auth)
 
     def list_file_access_requests(self, identifier, auth=False):
-        """
+        """Liste datafile access requests.
+
+        https://guides.dataverse.org/en/4.18.1/api/dataaccess.html#list-file-access-requests
+
         curl -H "X-Dataverse-key:$API_TOKEN" -X GET http://$SERVER/api/access/datafile/{id}/listRequests
         """
         url = "{0}/datafile/{1}/listRequests".format(
@@ -652,7 +643,7 @@ class NativeApi(Api):
 
     """
 
-    def __init__(self, base_url, api_token=None, api_version="v1"):
+    def __init__(self, base_url: str, api_token=None, api_version="v1"):
         """Init an Api() class.
 
         Scheme, host and path combined create the base-url for the api.
@@ -702,7 +693,9 @@ class NativeApi(Api):
         url = "{0}/dataverses/{1}".format(self.base_url_api_native, identifier)
         return self.get_request(url, auth=auth)
 
-    def create_dataverse(self, identifier, metadata, auth=True, parent=":root"):
+    def create_dataverse(
+        self, parent: str, metadata: str, auth: bool = True
+    ) -> Response:
         """Create a dataverse.
 
         Generates a new dataverse under identifier. Expects a JSON content
@@ -725,16 +718,12 @@ class NativeApi(Api):
 
         Parameters
         ----------
-        identifier : str
-            Can either be a dataverse id (long) or a dataverse alias (more
-            robust). If identifier is omitted, a root dataverse is created.
+        parent : str
+            Parent dataverse, to which the Dataverse gets attached to.
         metadata : str
-            Metadata of the Dataverse as a json-formatted string.
+            Metadata of the Dataverse.
         auth : bool
             True if api authorization is necessary. Defaults to ``True``.
-        parent : str
-            Parent dataverse, if existing, to which the Dataverse gets attached
-            to. Defaults to ``:root``.
 
         Returns
         -------
@@ -742,12 +731,8 @@ class NativeApi(Api):
             Response object of requests library.
 
         """
-        if not parent:
-            raise DataverseNotFoundError(
-                "Dataverse '{0}' not found. No parent dataverse passed to"
-                " `create_dataverse()`.".format(identifier)
-            )
-
+        metadata_dict = json.loads(metadata)
+        identifier = metadata_dict["alias"]
         url = "{0}/dataverses/{1}".format(self.base_url_api_native, parent)
         resp = self.post_request(url, metadata, auth)
 
@@ -881,10 +866,10 @@ class NativeApi(Api):
             print("Dataverse {0} deleted.".format(identifier))
         return resp
 
-    def get_dataverse_roles(self, identifier, auth=False):
-        """Get dataverse roles by alias or id.
+    def get_dataverse_roles(self, identifier: str, auth: bool = False) -> Response:
+        """All the roles defined directly in the dataverse by identifier.
 
-        View roles of a dataverse.
+        `Docs <https://guides.dataverse.org/en/latest/api/native-api.html#list-roles-defined-in-a-dataverse>`_
 
         .. code-block:: bash
 
@@ -905,7 +890,7 @@ class NativeApi(Api):
         url = "{0}/dataverses/{1}/roles".format(self.base_url_api_native, identifier)
         return self.get_request(url, auth=auth)
 
-    def get_dataverse_contents(self, identifier, auth=False):
+    def get_dataverse_contents(self, identifier, auth=True):
         """Gets contents of Dataverse.
 
         Parameters
@@ -975,7 +960,7 @@ class NativeApi(Api):
         url = "{0}/dataverses/{1}/facets".format(self.base_url_api_native, identifier)
         return self.get_request(url, auth=auth)
 
-    def dataverse_id2alias(self, dataverse_id):
+    def dataverse_id2alias(self, dataverse_id, auth=False):
         """Converts a Dataverse ID to an alias.
 
         Parameters
@@ -989,7 +974,7 @@ class NativeApi(Api):
             Dataverse alias
 
         """
-        resp = self.get_dataverse(dataverse_id)
+        resp = self.get_dataverse(dataverse_id, auth=auth)
         if "data" in resp.json():
             if "alias" in resp.json()["data"]:
                 return resp.json()["data"]["alias"]
@@ -1624,7 +1609,7 @@ class NativeApi(Api):
             print("Dataset {0} destroyed".format(resp.json()))
         return resp
 
-    def get_datafiles(self, pid, version=":latest", auth=True):
+    def get_datafiles_metadata(self, pid, version=":latest", auth=True):
         """List metadata of all datafiles of a dataset.
 
         `Documentation <http://guides.dataverse.org/en/latest/api/native-api.html#list-files-in-a-dataset>`_
@@ -1735,7 +1720,10 @@ class NativeApi(Api):
         persisted, so if you want to update a specific field first get the
         json with the above command and alter the fields you want.
 
+
         Also note that dataFileTags are not versioned and changes to these will update the published version of the file.
+
+        This functions needs CURL to work!
 
         HTTP Request:
 
@@ -1745,7 +1733,7 @@ class NativeApi(Api):
             curl -H "X-Dataverse-key:$API_TOKEN" -X POST -F 'jsonData={"description":"My description bbb.","provFreeform":"Test prov freeform","categories":["Data"],"restrict":false}' $SERVER_URL/api/files/$ID/metadata
             curl -H "X-Dataverse-key:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -X POST -F 'jsonData={"description":"My description bbb.","provFreeform":"Test prov freeform","categories":["Data"],"restrict":false}' "https://demo.dataverse.org/api/files/:persistentId/metadata?persistentId=doi:10.5072/FK2/AAA000"
 
-        `updating-file-metadata <http://guides.dataverse.org/en/latest/api/native-api.html#updating-file-metadata>`_.
+        `Docs <http://guides.dataverse.org/en/latest/api/native-api.html#updating-file-metadata>`_.
 
         Parameters
         ----------
@@ -1939,7 +1927,7 @@ class NativeApi(Api):
         url = "{0}/metadatablocks/{1}".format(self.base_url_api_native, identifier)
         return self.get_request(url, auth=auth)
 
-    def get_user_apitoken_expirationdate(self, auth=False):
+    def get_user_api_token_expiration_date(self, auth=False):
         """Get the expiration date of an Users's API token.
 
         HTTP Request:
@@ -1957,7 +1945,7 @@ class NativeApi(Api):
         url = "{0}/users/token".format(self.base_url_api_native)
         return self.get_request(url, auth=auth)
 
-    def recreate_user_apitoken(self):
+    def recreate_user_api_token(self):
         """Recreate an Users API token.
 
         HTTP Request:
@@ -1975,7 +1963,7 @@ class NativeApi(Api):
         url = "{0}/users/token/recreate".format(self.base_url_api_native)
         return self.post_request(url)
 
-    def delete_user_apitoken(self):
+    def delete_user_api_token(self):
         """Delete an Users API token.
 
         HTTP Request:
@@ -1993,8 +1981,10 @@ class NativeApi(Api):
         url = "{0}/users/token".format(self.base_url_api_native)
         return self.delete_request(url)
 
-    def create_dataverse_role(self, dataverse_id):
-        """Create a new role in a Dataverse.
+    def create_role(self, dataverse_id):
+        """Create a new role.
+
+        `Docs <https://guides.dataverse.org/en/latest/api/native-api.html#id2>`_
 
         HTTP Request:
 
@@ -2016,8 +2006,10 @@ class NativeApi(Api):
         url = "{0}/roles?dvo={1}".format(self.base_url_api_native, dataverse_id)
         return self.post_request(url)
 
-    def get_dataverse_role(self, role_id, auth=False):
-        """Get role of a Dataverse.
+    def show_role(self, role_id, auth=False):
+        """Show role.
+
+        `Docs <https://guides.dataverse.org/en/latest/api/native-api.html#show-role>`_
 
         HTTP Request:
 
@@ -2039,8 +2031,10 @@ class NativeApi(Api):
         url = "{0}/roles/{1}".format(self.base_url_api_native, role_id)
         return self.get_request(url, auth=auth)
 
-    def delete_dataverse_role(self, role_id):
-        """Delete role of a Dataverse.
+    def delete_role(self, role_id):
+        """Delete role.
+
+        `Docs <https://guides.dataverse.org/en/latest/api/native-api.html#delete-role>`_
 
         Parameters
         ----------
@@ -2057,7 +2051,7 @@ class NativeApi(Api):
         return self.delete_request(url)
 
     def get_children(
-        self, parent=":root", parent_type="dataverse", children_types=None
+        self, parent=":root", parent_type="dataverse", children_types=None, auth=True
     ):
         """Walk through children of parent element in Dataverse tree.
 
@@ -2096,6 +2090,8 @@ class NativeApi(Api):
             Description of parameter `parent_type`.
         children_types : list
             Types of children to be collected. 'dataverses', 'datasets' and 'datafiles' are valid list items.
+        auth : bool
+            Authentication needed
 
         Returns
         -------
@@ -2112,6 +2108,7 @@ class NativeApi(Api):
 
         """
         children = []
+
         if children_types is None:
             children_types = []
 
@@ -2135,7 +2132,7 @@ class NativeApi(Api):
         if parent_type == "dataverse":
             # check for dataverses and datasets as children and get their ID
             parent_alias = parent
-            resp = self.get_dataverse_contents(parent_alias)
+            resp = self.get_dataverse_contents(parent_alias, auth=auth)
             if "data" in resp.json():
                 contents = resp.json()["data"]
                 for content in contents:
@@ -2144,23 +2141,22 @@ class NativeApi(Api):
                         and "dataverses" in children_types
                     ):
                         dataverse_id = content["id"]
-                        title = content["title"]
-                        child_alias = self.dataverse_id2alias(dataverse_id)
+                        child_alias = self.dataverse_id2alias(dataverse_id, auth=auth)
                         children.append(
                             {
                                 "dataverse_id": dataverse_id,
-                                "title": title,
+                                "title": content["title"],
                                 "dataverse_alias": child_alias,
                                 "type": "dataverse",
                                 "children": self.get_children(
                                     parent=child_alias,
                                     parent_type="dataverse",
                                     children_types=children_types,
+                                    auth=auth,
                                 ),
                             }
                         )
                     elif content["type"] == "dataset" and "datasets" in children_types:
-                        dataset_id = content["identifier"]
                         pid = (
                             content["protocol"]
                             + ":"
@@ -2170,13 +2166,14 @@ class NativeApi(Api):
                         )
                         children.append(
                             {
-                                "dataset_id": dataset_id,
+                                "dataset_id": content["id"],
                                 "pid": pid,
                                 "type": "dataset",
                                 "children": self.get_children(
                                     parent=pid,
                                     parent_type="dataset",
                                     children_types=children_types,
+                                    auth=auth,
                                 ),
                             }
                         )
@@ -2185,22 +2182,131 @@ class NativeApi(Api):
         elif parent_type == "dataset" and "datafiles" in children_types:
             # check for datafiles as children and get their ID
             pid = parent
-            resp = self.get_datafiles(parent, version=":latest")
+            resp = self.get_datafiles_metadata(parent, version=":latest")
             if "data" in resp.json():
-                for file in resp.json()["data"]:
-                    datafile_id = file["dataFile"]["id"]
-                    filename = file["dataFile"]["filename"]
+                for datafile in resp.json()["data"]:
                     children.append(
                         {
-                            "datafile_id": datafile_id,
-                            "filename": filename,
-                            "pid": pid,
+                            "datafile_id": datafile["dataFile"]["id"],
+                            "filename": datafile["dataFile"]["filename"],
+                            "label": datafile["label"],
+                            "pid": datafile["dataFile"]["persistentId"],
                             "type": "datafile",
                         }
                     )
             else:
                 print("ERROR: 'get_datafiles()' API request not working.")
         return children
+
+    def get_user(self):
+        """Get details of the current authenticated user.
+
+        Auth must be ``true`` for this to work. API endpoint is available for Dataverse >= 5.3.
+
+        https://guides.dataverse.org/en/latest/api/native-api.html#get-user-information-in-json-format
+        """
+        url = f"{self.base_url}/users/:me"
+        return self.get_request(url, auth=True)
+
+    def redetect_file_type(
+        self, identifier: str, is_pid: bool = False, dry_run: bool = False
+    ) -> Response:
+        """Redetect file type.
+
+        https://guides.dataverse.org/en/latest/api/native-api.html#redetect-file-type
+
+        Parameters
+        ----------
+        identifier : str
+            Datafile id (fileid) or file PID.
+        is_pid : bool
+            Is the identifier a PID, by default False.
+        dry_run : bool, optional
+            [description], by default False
+
+        Returns
+        -------
+        Response
+            Request Response() object.
+        """
+        if dry_run is True:
+            dry_run_str = "true"
+        elif dry_run is False:
+            dry_run_str = "false"
+        if is_pid:
+            url = f"{self.base_url_api_native}/files/:persistentId/redetect?persistentId={identifier}&dryRun={dry_run_str}"
+        else:
+            url = f"{self.base_url_api_native}/files/{identifier}/redetect?dryRun={dry_run_str}"
+        return self.post_request(url, auth=True)
+
+    def reingest_datafile(self, identifier: str, is_pid: bool = False) -> Response:
+        """Reingest datafile.
+
+        https://guides.dataverse.org/en/latest/api/native-api.html#reingest-a-file
+
+        Parameters
+        ----------
+        identifier : str
+            Datafile id (fileid) or file PID.
+        is_pid : bool
+            Is the identifier a PID, by default False.
+
+        Returns
+        -------
+        Response
+            Request Response() object.
+        """
+        if is_pid:
+            url = f"{self.base_url_api_native}/files/:persistentId/reingest?persistentId={identifier}"
+        else:
+            url = f"{self.base_url_api_native}/files/{identifier}/reingest"
+        return self.post_request(url, auth=True)
+
+    def uningest_datafile(self, identifier: str, is_pid: bool = False) -> Response:
+        """Uningest datafile.
+
+        https://guides.dataverse.org/en/latest/api/native-api.html#uningest-a-file
+
+        Parameters
+        ----------
+        identifier : str
+            Datafile id (fileid) or file PID.
+        is_pid : bool
+            Is the identifier a PID, by default False.
+
+        Returns
+        -------
+        Response
+            Request Response() object.
+        """
+        if is_pid:
+            url = f"{self.base_url_api_native}/files/:persistentId/uningest?persistentId={identifier}"
+        else:
+            url = f"{self.base_url_api_native}/files/{identifier}/uningest"
+        return self.post_request(url, auth=True)
+
+    def restrict_datafile(self, identifier: str, is_pid: bool = False) -> Response:
+        """Uningest datafile.
+
+        https://guides.dataverse.org/en/latest/api/native-api.html#restrict-files
+
+        Parameters
+        ----------
+        identifier : str
+            Datafile id (fileid) or file PID.
+        is_pid : bool
+            Is the identifier a PID, by default False.
+
+        Returns
+        -------
+        Response
+            Request Response() object.
+        """
+        if is_pid:
+            url = f"{self.base_url_api_native}/files/:persistentId/restrict?persistentId={identifier}"
+        else:
+            url = f"{self.base_url_api_native}/files/{identifier}/restrict"
+        return self.put_request(url, auth=True)
 
 
 class SearchApi(Api):
@@ -2293,16 +2399,16 @@ class SwordApi(Api):
 
     Parameters
     ----------
-    sword_api_version : type
-        Description of parameter `sword_api_version` (the default is 'v1.1').
+    sword_api_version : str
+        SWORD API version. Defaults to 'v1.1'.
 
     Attributes
     ----------
-    base_url_api_sword : type
+    base_url_api_sword : str
         Description of attribute `base_url_api_sword`.
-    base_url : type
+    base_url : str
         Description of attribute `base_url`.
-    native_api_version : type
+    native_api_version : str
         Description of attribute `native_api_version`.
     sword_api_version
 
@@ -2311,7 +2417,7 @@ class SwordApi(Api):
     def __init__(
         self, base_url, api_version="v1.1", api_token=None, sword_api_version="v1.1"
     ):
-        """Init an SwordApi() class.
+        """Init a :class:`SwordApi <pyDataverse.api.SwordApi>` instance.
 
         Parameters
         ----------
@@ -2320,7 +2426,7 @@ class SwordApi(Api):
 
         """
         super().__init__(base_url, api_token, api_version)
-        if not isinstance(sword_api_version, ("".__class__, u"".__class__)):
+        if not isinstance(sword_api_version, ("".__class__, "".__class__)):
             raise ApiUrlError(
                 "sword_api_version {0} is not a string.".format(sword_api_version)
             )
@@ -2335,7 +2441,7 @@ class SwordApi(Api):
             self.base_url_api_sword = base_url
 
     def __str__(self):
-        """Return name of Api() class for users.
+        """Return name of :class:Api() class for users.
 
         Returns
         -------

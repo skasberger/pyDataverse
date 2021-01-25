@@ -1,4 +1,0 @@
-# Requirements for development.
-tox
-wheel
-pre-commit

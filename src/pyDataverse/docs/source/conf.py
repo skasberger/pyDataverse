@@ -1,6 +1,3 @@
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
-#
 # Configuration file for the Sphinx documentation builder.
 #
 # This file does only contain a selection of the most common options. For a
@@ -23,7 +20,6 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath("../../.."))
-
 
 project = "pyDataverse"
 author = "Stefan Kasberger"
@@ -204,4 +200,5 @@ texinfo_documents = [
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "requests": ("https://requests.readthedocs.io/en/master", None),
 }

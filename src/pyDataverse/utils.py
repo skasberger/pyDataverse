@@ -1,13 +1,44 @@
-# !/usr/bin/env python
-# -*- coding: utf-8 -*-
 """Helper functions."""
-from __future__ import absolute_import
-
 import csv
 import json
+import os
 import pickle
 
 from jsonschema import validate
+
+
+CSV_JSON_COLS = [
+    "otherId",
+    "series",
+    "author",
+    "dsDescription",
+    "subject",
+    "keyword",
+    "topicClassification",
+    "language",
+    "grantNumber",
+    "dateOfCollection",
+    "kindOfData",
+    "dataSources",
+    "otherReferences",
+    "contributor",
+    "relatedDatasets",
+    "relatedMaterial",
+    "datasetContact",
+    "distributor",
+    "producer",
+    "publication",
+    "software",
+    "timePeriodCovered",
+    "geographicUnit",
+    "geographicBoundingBox",
+    "geographicCoverage",
+    "socialScienceNotes",
+    "unitOfAnalysis",
+    "universe",
+    "targetSampleActualSize",
+    "categories",
+]
 
 
 def read_file(filename, mode="r", encoding="utf-8"):
@@ -63,7 +94,7 @@ def write_file(filename, data, mode="w", encoding="utf-8"):
         f.write(data)
 
 
-def read_json(filename, mode="r", encoding="utf-8"):
+def read_json(filename: str, mode: str = "r", encoding: str = "utf-8") -> dict:
     """Read in a json file.
 
     See more about the json module at
@@ -85,14 +116,10 @@ def read_json(filename, mode="r", encoding="utf-8"):
         Data as a json-formatted string.
 
     """
-    assert isinstance(filename, str)
-    assert isinstance(mode, str)
-    assert isinstance(encoding, str)
-
+    # TODO: add kwargs
     with open(filename, mode, encoding=encoding) as f:
         data = json.load(f)
 
-    assert isinstance(data, dict)
     return data
 
 
@@ -112,11 +139,6 @@ def write_json(filename, data, mode="w", encoding="utf-8"):
         Character encoding of file. Defaults to 'utf-8'.
 
     """
-    assert isinstance(filename, str)
-    assert isinstance(data, str)
-    assert isinstance(mode, str)
-    assert isinstance(encoding, str)
-
     with open(filename, mode, encoding=encoding) as f:
         json.dump(data, f, indent=2)
 
@@ -239,7 +261,16 @@ def write_csv(
 
 
 def read_csv_as_dicts(
-    filename, newline="", delimiter=",", quotechar='"', encoding="utf-8"
+    filename,
+    newline="",
+    delimiter=",",
+    quotechar='"',
+    encoding="utf-8",
+    remove_prefix=True,
+    prefix="dv.",
+    json_cols=CSV_JSON_COLS,
+    false_values=["FALSE"],
+    true_values=["TRUE"],
 ):
     """Read in CSV file into a list of :class:`dict`.
 
@@ -254,7 +285,7 @@ def read_csv_as_dicts(
 
     Recommendation: Name the column name the way you want the attribute to be
     named later in your Dataverse object. See the
-    `pyDataverse templates <https://github.com/AUSSDA/pyDataverse_templates>`_
+    `pyDataverse templates <https://github.com/GDCC/pyDataverse_templates>`_
     for this. The created :class:`dict` can later be used for the `set()`
     function to create Dataverse objects.
 
@@ -289,7 +320,46 @@ def read_csv_as_dicts(
         data = []
         for row in reader:
             data.append(dict(row))
-    assert isinstance(data, list)
+
+    data_tmp = []
+    for ds in data:
+        ds_tmp = {}
+        for key, val in ds.items():
+            if val in false_values:
+                ds_tmp[key] = False
+                ds_tmp[key] = True
+            elif val in true_values:
+                ds_tmp[key] = True
+            else:
+                ds_tmp[key] = val
+
+        data_tmp.append(ds_tmp)
+    data = data_tmp
+
+    if remove_prefix:
+        data_tmp = []
+        for ds in data:
+            ds_tmp = {}
+            for key, val in ds.items():
+                if key.startswith(prefix):
+                    ds_tmp[key[len(prefix) :]] = val
+                else:
+                    ds_tmp[key] = val
+            data_tmp.append(ds_tmp)
+        data = data_tmp
+
+    if len(json_cols) > 0:
+        data_tmp = []
+        for ds in data:
+            ds_tmp = {}
+            for key, val in ds.items():
+                if key in json_cols:
+                    ds_tmp[key] = json.loads(val)
+                else:
+                    ds_tmp[key] = val
+            data_tmp.append(ds_tmp)
+        data = data_tmp
+
     return data
 
 
@@ -355,7 +425,7 @@ def clean_string(string):
     return clean_str
 
 
-def validate_data(data, filename_schema, file_format="json"):
+def validate_data(data: dict, filename_schema: str, file_format: str = "json") -> bool:
     """Validate data against a schema.
 
     Parameters
@@ -482,3 +552,117 @@ def create_datafile_url(base_url, identifier, is_filepid):
         url = "{0}/file.xhtml?fileId={1}".format(base_url, identifier)
     assert isinstance(url, str)
     return url
+
+
+def dataverse_tree_walker(
+    data: list,
+    dv_keys: list = ["dataverse_id", "dataverse_alias"],
+    ds_keys: list = ["dataset_id", "pid"],
+    df_keys: list = ["datafile_id", "filename", "pid", "label"],
+) -> tuple:
+    """Walk through a Dataverse tree by get_children().
+
+    Recursively walk through the tree structure returned by ``get_children()``
+    and extract the keys needed.
+
+    Parameters
+    ----------
+    data : dict
+        Tree data structure returned by ``get_children()``.
+    dv_keys : list
+        List of keys to be extracted from each Dataverse element.
+    ds_keys : list
+        List of keys to be extracted from each Dataset element.
+    df_keys : list
+        List of keys to be extracted from each Datafile element.
+
+    Returns
+    -------
+    tuple
+        (List of Dataverse, List of Datasets, List of Datafiles)
+    """
+    dataverses = []
+    datasets = []
+    datafiles = []
+
+    if type(data) == list:
+        for elem in data:
+            dv, ds, df = dataverse_tree_walker(elem)
+            dataverses += dv
+            datasets += ds
+            datafiles += df
+    elif type(data) == dict:
+        if data["type"] == "dataverse":
+            dv_tmp = {}
+            for key in dv_keys:
+                if key in data:
+                    dv_tmp[key] = data[key]
+            dataverses.append(dv_tmp)
+        elif data["type"] == "dataset":
+            ds_tmp = {}
+            for key in ds_keys:
+                if key in data:
+                    ds_tmp[key] = data[key]
+            datasets.append(ds_tmp)
+        elif data["type"] == "datafile":
+            df_tmp = {}
+            for key in df_keys:
+                if key in data:
+                    df_tmp[key] = data[key]
+            datafiles.append(df_tmp)
+        if "children" in data:
+            if len(data["children"]) > 0:
+                dv, ds, df = dataverse_tree_walker(data["children"])
+                dataverses += dv
+                datasets += ds
+                datafiles += df
+    return dataverses, datasets, datafiles
+
+
+def save_tree_data(
+    dataverses: list,
+    datasets: list,
+    datafiles: list,
+    filename_dv: str = "dataverses.json",
+    filename_ds: str = "datasets.json",
+    filename_df: str = "datafiles.json",
+    filename_md: str = "metadata.json",
+) -> None:
+    """Save lists from data returend by ``dv_tree_walker``.
+
+    Collect lists of Dataverses, Datasets and Datafiles and save them in seperated JSON files.
+
+    Parameters
+    ----------
+    data : dict
+        Tree data structure returned by ``get_children()``.
+    filename_dv : str
+        Filename with full path for the Dataverse JSON file.
+    filename_ds : str
+        Filename with full path for the Dataset JSON file.
+    filename_df : str
+        Filename with full path for the Datafile JSON file.
+    filename_md : str
+        Filename with full path for the metadata JSON file.
+    """
+    if os.path.isfile(filename_dv):
+        os.remove(filename_dv)
+    if os.path.isfile(filename_ds):
+        os.remove(filename_ds)
+    if os.path.isfile(filename_df):
+        os.remove(filename_df)
+    if len(dataverses) > 0:
+        write_json(filename_dv, dataverses)
+    if len(datasets) > 0:
+        write_json(filename_ds, datasets)
+    if len(datafiles) > 0:
+        write_json(filename_df, datafiles)
+    metadata = {
+        "dataverses": len(dataverses),
+        "datasets": len(datasets),
+        "datafiles": len(datafiles),
+    }
+    write_json(filename_md, metadata)
+    print(f"- Dataverses: {len(dataverses)}")
+    print(f"- Datasets: {len(datasets)}")
+    print(f"- Datafiles: {len(datafiles)}")
